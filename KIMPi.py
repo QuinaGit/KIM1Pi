@@ -56,7 +56,7 @@ TIMEOUT_KIM   	  = 3                             # Timeout, nothing returned by 
 # -------------------------------------------------------------------------- //
 def DBprint(msg,*args,**kwargs):
   if KIMPI_DEBUG:
-    print(msg,*args,**kwargs)
+    print("KIMPi ",msg,*args,**kwargs)
 
 # -------------------------------------------------------------------------- //
 #! init functions
@@ -74,19 +74,18 @@ def init():
     GPIO.setup(ON_OFF_KIM_PIN,GPIO.OUT)
     GPIO.output(ON_OFF_KIM_PIN,False)
     DBprint("INFO: Serial and GPIO initialised")
-  else:
-    DBprint("INFO: Serial initialised")
 
 # -------------------------------------------------------------------------- //
 #! destructor functions must be called at the end
 # -------------------------------------------------------------------------- //
 def deinit_serial():
   global ser 
-  ser.__del__()				                            # De-initialise and close port
+  if ser: ser.__del__()				                            # De-initialise and close port
 
 def deinit():
   DBprint("INFO: KIMpi - Clean up") 
   deinit_serial()
+  GPIO.output(ON_OFF_KIM_PIN,False)
   GPIO.cleanup()                                  # cleanup all GPIO 
 
 # -------------------------------------------------------------------------- //
@@ -130,9 +129,7 @@ def set_sleepmode(mode: bool) -> bool:
           return True
 
       else: #mode == True
-        GPIO.output(ON_OFF_KIM_PIN,False)
-        ser.reset_output_buffer() 		            # clean TX buffer
-        ser.reset_input_buffer() 		              # clean RX buffer
+
         deinit_serial()
         return True
 
@@ -167,9 +164,6 @@ def send_ATcommand(command):
 
     response = serBuff.decode('utf-8')
 
-    if (response[2] == 'X'):
-      return 0 # OK_KIM -> +TX=0,<data>
-
     if (response[1] == 'O' or                     # +OK	
         response[1] == 'I' or                     # +ID=
         response[1] == 'S' or                     # +SN=
@@ -177,16 +171,14 @@ def send_ATcommand(command):
         response[2] == 'T' or                     # +ATXFRQ=
         response[1] == 'P' or                     # +PWR=
         response[2] == 'F' or                     # +AFMT=
-      # response[1] == 'C' or                     # +CW=OK
-        response[2] == 'X'                        # +TX=0,<data>
+        response[1] == 'C'                        # +CW=OK
     ):
-      if (command[4] != 'X'):                     # AT+TX=
         return 0 # OK_KIM
-      else:
-        return 2 # UNKNOWN_ERROR_KIM
-      
+
     elif (response[1] == 'R'):  # ERROR=
         return 1 # ERROR_KIM
+    else:
+        return 2 # UNKNOWN_ERROR_KIM
   
   return 3 # TIMEOUT_KIM
 
